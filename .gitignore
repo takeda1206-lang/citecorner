@@ -1,0 +1,20 @@
+# dependencies / build output
+node_modules
+dist
+.wrangler
+
+# Claude Code local-only files (machine/session specific)
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+
+# OS / editor
+.DS_Store
+
+# logs
+*.log
+npm-debug.log*
+
+# local env / secrets
+.env
+.env.*
+*.local
