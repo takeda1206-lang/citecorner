@@ -4,6 +4,7 @@ import CopyButton from './CopyButton.jsx';
 
 export default function ResultCard({ citation }) {
   const c = citation;
+  const isJa = c.lang === 'ja';
   const outputs = buildOutputs(c);
   const pages = pageRange(c);
 
@@ -22,29 +23,33 @@ export default function ResultCard({ citation }) {
 
   return (
     <>
-      <div className="card">
-        <h2 className="card-title">
-          <span className="dot" />
-          取得した情報
-          {c.estimated && <span className="badge">推定（要確認）</span>}
-        </h2>
-        <div className="fields">
-          {fields.map(([k, v]) => (
-            <Fragment key={k}>
-              <div className="field-key">{k}</div>
-              <div className={`field-val ${v ? '' : 'none'}`}>{v || 'なし'}</div>
-            </Fragment>
-          ))}
+      {/* 日本語文献では修正欄が項目一覧を兼ねるため「取得した情報」カードは出さない */}
+      {!isJa && (
+        <div className="card">
+          <h2 className="card-title">
+            <span className="dot" />
+            取得した情報
+            {c.estimated && <span className="badge">推定（要確認）</span>}
+          </h2>
+          <div className="fields">
+            {fields.map(([k, v]) => (
+              <Fragment key={k}>
+                <div className="field-key">{k}</div>
+                <div className={`field-val ${v ? '' : 'none'}`}>{v || 'なし'}</div>
+              </Fragment>
+            ))}
+          </div>
+          {c.sources && c.sources.length > 0 && (
+            <div className="source-note">情報源: {c.sources.join(' / ')}</div>
+          )}
         </div>
-        {c.sources && c.sources.length > 0 && (
-          <div className="source-note">情報源: {c.sources.join(' / ')}</div>
-        )}
-      </div>
+      )}
 
       <div className="card">
         <h2 className="card-title">
           <span className="dot" />
           整形結果
+          {isJa && <span className="badge badge-green">日本語（検索なし）</span>}
         </h2>
         <div className="outputs">
           {outputs.map((o) => {

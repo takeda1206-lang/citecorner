@@ -2,10 +2,16 @@
 import { normalizeDoi } from './api.js';
 import { parseCitationText } from './parse.js';
 
-const TYPE_LABEL = { doi: 'DOI', pmid: 'PMID', title: 'タイトル', empty: '' };
+const TYPE_LABEL = { doi: 'DOI', pmid: 'PMID', title: 'タイトル', japanese: '日本語', empty: '' };
 
 export function describeType(t) {
   return TYPE_LABEL[t] ?? t;
+}
+
+// ひらがな・カタカナ・漢字・半角カナを含むか
+const JA_RE = /[぀-ヿ㐀-䶿一-鿿豈-﫿ｦ-ﾟ]/;
+export function containsJapanese(t) {
+  return JA_RE.test(t || '');
 }
 
 // 判定結果: { type: 'doi'|'pmid'|'title'|'empty', value, embedded? }
@@ -14,6 +20,9 @@ export function describeType(t) {
 export function detectInput(raw) {
   const t = (raw || '').replace(/\s+/g, ' ').trim();
   if (!t) return { type: 'empty', value: null };
+
+  // 日本語を含む場合は検索せず、入力された範囲で整形する（誤情報防止のため最優先）
+  if (containsJapanese(t)) return { type: 'japanese', value: t };
 
   // 純粋な数字（4〜9桁）は PMID とみなす
   if (/^\d{4,9}$/.test(t)) return { type: 'pmid', value: t };

@@ -18,6 +18,7 @@ function emptyCitation() {
     doi: null,
     pmid: null,
     estimated: true,
+    lang: null,
     sources: ['推定'],
   };
 }
@@ -43,6 +44,92 @@ function parseAuthors(s) {
     .map((n) => n.trim().replace(/\.$/, '').replace(/\s+/g, ' '))
     .filter(Boolean)
     .filter((n) => !/^and$/i.test(n));
+}
+
+// ---- 日本語文献（検索なし・入力の範囲のみ・推測なし） ----------------------
+
+// 全角の数字・英字・記号をASCIIに正規化（機械的な表記ゆれ吸収のみ）
+function normalizeJa(s) {
+  return String(s || '')
+    .replace(/[０-９Ａ-Ｚａ-ｚ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+    .replace(/（/g, '(')
+    .replace(/）/g, ')')
+    .replace(/；/g, ';')
+    .replace(/：/g, ':')
+    .replace(/，/g, ',')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// 著者欄をカンマ・読点で分割（「他」「ほか」「et al」は著者として数えない）
+function splitJaAuthors(s) {
+  return String(s || '')
+    .split(/[,、]/)
+    .map((a) => a.trim())
+    .filter(Boolean)
+    .filter((a) => !/^(他|ほか|et\s*al\.?)$/i.test(a));
+}
+
+// 日本語文献のパース。
+// 「著者名. 論文タイトル. 雑誌名. 年;巻(号):開始-終了.」の並びとして機械的に分割する。
+// 検索・推測は一切しない（分割の解釈違いは修正欄で直してもらう前提）。
+export function parseJapaneseCitation(raw) {
+  const c = emptyCitation();
+  c.lang = 'ja';
+  c.estimated = false;
+  c.sources = ['入力テキスト（検索なし）'];
+
+  let t = normalizeJa(raw);
+  if (!t) return c;
+
+  // 入力に書かれている DOI / PMID はそのまま拾う（検索はしない）
+  const doiM = t.match(/10\.\d{4,9}\/[^\s"<>]+/);
+  if (doiM) c.doi = doiM[0].replace(/[.,;)\]]+$/, '');
+  const pmidM = t.match(/\bPMID[\s:]*(\d{4,9})\b/i);
+  if (pmidM) c.pmid = pmidM[1];
+  let head = t
+    .replace(/\b(?:doi[\s:]*)?10\.\d{4,9}\/[^\s"<>]+/gi, '')
+    .replace(/\bPMID[\s:]*\d{4,9}\b/gi, '')
+    .trim();
+
+  // 末尾の「年;巻(号):頁」パターン（年の後の「年」、ダッシュ類の表記ゆれを許容）
+  const tail = head.match(
+    /((?:19|20)\d{2})\s*年?\s*;\s*(\d+)\s*(?:\(([^)]+)\))?\s*(?::\s*([A-Za-z]?\d+)(?:\s*[-‐–—−ー－〜～]\s*([A-Za-z]?\d+))?)?/
+  );
+  if (tail) {
+    c.year = tail[1];
+    c.volume = tail[2] || null;
+    c.issue = tail[3] || null;
+    c.pageStart = tail[4] || null;
+    c.pageEnd = tail[5] || null;
+    head = head.slice(0, tail.index).trim();
+  } else {
+    // 末尾近くの「2020年.」「(2020)」のような年だけの表記（タイトル中の年号は拾わない）
+    const y = head.match(/[(\s]((?:19|20)\d{2})\s*年?\s*[).。．]?\s*$/);
+    if (y) {
+      c.year = y[1];
+      head = head.slice(0, y.index).trim();
+    }
+  }
+
+  // 「著者名. タイトル. 雑誌名」の並びとして位置で分割（区切り: 。 ． .）
+  const segs = head
+    .split(/[.。．]\s*/)
+    .map((s) => s.trim().replace(/[,、]+$/, ''))
+    .filter(Boolean);
+
+  if (segs.length >= 3) {
+    c.authors = splitJaAuthors(segs[0]);
+    c.title = segs.slice(1, -1).join('. ') || null;
+    c.journalAbbrev = segs[segs.length - 1] || null;
+  } else if (segs.length === 2) {
+    c.authors = splitJaAuthors(segs[0]);
+    c.title = segs[1] || null;
+  } else if (segs.length === 1) {
+    c.title = segs[0]; // 1区切りだけの入力はタイトルとして扱う（修正欄で変更可能）
+  }
+
+  return c;
 }
 
 export function parseCitationText(text) {

@@ -529,6 +529,29 @@ code {
   vertical-align: middle;
 }
 
+.badge-green {
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  border-color: var(--accent-light);
+}
+
+/* ---- 日本語文献の修正欄 ---- */
+.ja-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ja-edit-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 10px;
+}
+
+.ja-edit-row.two {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
 .source-note {
   font-size: 12px;
   color: var(--muted);

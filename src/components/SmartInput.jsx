@@ -7,7 +7,7 @@ import {
   normalizeDoi,
 } from '../lib/api.js';
 import { detectInput, describeType } from '../lib/detect.js';
-import { parseCitationText } from '../lib/parse.js';
+import { parseCitationText, parseJapaneseCitation } from '../lib/parse.js';
 import CandidateList from './CandidateList.jsx';
 
 const MODES = [
@@ -15,6 +15,7 @@ const MODES = [
   { key: 'doi', label: 'DOI' },
   { key: 'pmid', label: 'PMID' },
   { key: 'title', label: 'タイトル' },
+  { key: 'japanese', label: '日本語' },
 ];
 
 // モードに応じて「何をどの値で引くか」を決める
@@ -24,6 +25,9 @@ function resolveInput(mode, text) {
   if (mode === 'pmid') {
     const m = String(text).match(/\d{1,9}/);
     return { type: 'pmid', value: m ? m[0] : null, auto: false };
+  }
+  if (mode === 'japanese') {
+    return { type: 'japanese', value: String(text).trim() || null, auto: false };
   }
   return { type: 'title', value: String(text).replace(/\s+/g, ' ').trim() || null, auto: false };
 }
@@ -51,6 +55,17 @@ export default function SmartInput({ run, onResult, busy, onFileInput }) {
       }
       const key = `${eff.type}|${eff.value}`;
       if (!force && lastKeyRef.current === key) return;
+      // 日本語: 検索せず、入力された範囲だけで整形（ネットワークアクセスなし）
+      if (eff.type === 'japanese') {
+        lastKeyRef.current = key;
+        setItems(null);
+        onResult(parseJapaneseCitation(rawText));
+        setStatus({
+          kind: 'ok',
+          msg: '日本語として認識 — 検索せず入力内容から整形しました。下の修正欄で調整できます。',
+        });
+        return;
+      }
       const my = ++seqRef.current;
       setStatus({ kind: 'busy', msg: `${describeType(eff.type)}として検索中…` });
       try {
@@ -119,8 +134,12 @@ export default function SmartInput({ run, onResult, busy, onFileInput }) {
       setStatus({ kind: 'info', msg: 'タイトルとして認識 — もう少し入力すると自動検索します。' });
       return;
     }
-    setStatus({ kind: 'info', msg: `${describeType(eff.type)}として認識 — まもなく自動検索します…` });
-    const delay = eff.type === 'title' ? 800 : 400;
+    setStatus(
+      eff.type === 'japanese'
+        ? { kind: 'info', msg: '日本語として認識 — 検索せず入力内容から整形します…' }
+        : { kind: 'info', msg: `${describeType(eff.type)}として認識 — まもなく自動検索します…` }
+    );
+    const delay = eff.type === 'title' ? 800 : eff.type === 'japanese' ? 700 : 400;
     timerRef.current = setTimeout(() => lookup(eff, text), delay);
     return () => clearTimeout(timerRef.current);
   }, [text, mode, lookup]);
@@ -191,6 +210,7 @@ export default function SmartInput({ run, onResult, busy, onFileInput }) {
       </div>
       <p className="hint">
         自動判別が誤るときは種類ボタンで指定してください（Enterで即実行・Shift+Enterで改行）。
+        日本語を含む入力は検索せず、入力された範囲だけで整形します。
         PDF・画像はこのページへのドラッグ＆ドロップや貼り付けでも読み取れます。
       </p>
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ocrImage } from '../lib/ocr.js';
-import { titleQueryFromText } from '../lib/detect.js';
-import { parseCitationText } from '../lib/parse.js';
+import { titleQueryFromText, containsJapanese } from '../lib/detect.js';
+import { parseCitationText, parseJapaneseCitation } from '../lib/parse.js';
 import {
   fromDoi,
   fromPmid,
@@ -41,6 +41,13 @@ export default function ImageInput({ run, onResult, busy, droppedFile }) {
     const norm = (raw || '').replace(/\s+/g, ' ').trim();
     if (!norm) return;
     const my = ++seqRef.current;
+    // 日本語を含むテキストは検索せず、入力された範囲で整形
+    if (containsJapanese(norm)) {
+      setItems(null);
+      onResult(parseJapaneseCitation(norm));
+      setStatus({ kind: 'ok', msg: '日本語を検出 — 検索せず入力内容から整形しました。下の修正欄で調整できます。' });
+      return;
+    }
     setStatus({ kind: 'busy', msg: 'タイトルを判別して検索中…' });
     try {
       const q = titleQueryFromText(norm);

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import Header from './components/Header.jsx';
 import InputPanel from './components/InputPanel.jsx';
+import JapaneseEditCard from './components/JapaneseEditCard.jsx';
 import ResultCard from './components/ResultCard.jsx';
 
 export default function App() {
@@ -80,6 +81,9 @@ export default function App() {
       )}
       {error && <div className="error">{error}</div>}
 
+      {result && result.lang === 'ja' && (
+        <JapaneseEditCard citation={result} onResult={onResult} />
+      )}
       {result && <ResultCard citation={result} />}
 
       {!result && !busy && !error && (

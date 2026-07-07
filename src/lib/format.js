@@ -34,9 +34,9 @@ export function pageRange(c) {
   return s || '';
 }
 
-// 末尾が . ? ! で終わっているか
+// 末尾が句読点（和文含む）で終わっているか
 function endsWithPunct(s) {
-  return /[.?!]$/.test(s.trim());
+  return /[.?!。．？！]$/.test(s.trim());
 }
 
 // 「文」を連結する。前の文が句読点で終わっていればスペースのみ、
@@ -88,11 +88,12 @@ export function allAuthors(c) {
 }
 
 // 筆頭著者 + et al.（著者1人なら et al. を付けない）
+// 日本語文献では「武田太郎, 他」形式（build() 側で末尾に . が付く）
 export function firstAuthorEtAl(c) {
   const a = c.authors || [];
   if (a.length === 0) return '';
   if (a.length === 1) return a[0];
-  return `${a[0]}, et al`; // build() 側で末尾に . が付き "Takeda T, et al." になる
+  return c.lang === 'ja' ? `${a[0]}, 他` : `${a[0]}, et al`;
 }
 
 // 出力1: フルVancouver（全著者・タイトルあり）
