@@ -8,6 +8,8 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: {
+    // PORT 環境変数があればそれを使う（プレビュー環境のポート自動割当に対応）
+    port: process.env.PORT ? Number(process.env.PORT) : 5173,
     proxy: {
       '/api/ncbi': {
         target: 'https://eutils.ncbi.nlm.nih.gov',

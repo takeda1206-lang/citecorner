@@ -329,6 +329,109 @@ textarea {
   border: 1px solid #f1d6cf;
 }
 
+/* ---- 種類選択チップ / インライン状態表示 ---- */
+.smart-text {
+  min-height: 68px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.chip {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--muted);
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.chip:hover {
+  border-color: var(--accent-light);
+}
+
+.chip.detected {
+  border-color: var(--accent);
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+}
+
+.chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.inline-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 10px;
+}
+
+.inline-status .spinner {
+  width: 13px;
+  height: 13px;
+  border-width: 2px;
+}
+
+.inline-status.error {
+  color: var(--danger);
+}
+
+.inline-status.ok {
+  color: var(--accent-dark);
+}
+
+.link-btn {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent-dark);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-family: inherit;
+}
+
+.link-btn:hover {
+  color: var(--accent);
+}
+
+/* ---- ファイルドロップのオーバーレイ ---- */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(88, 120, 80, 0.08);
+  display: grid;
+  place-items: center;
+  pointer-events: none; /* ドロップイベントは下の window ハンドラで受ける */
+}
+
+.drop-overlay-box {
+  background: #fff;
+  border: 2px dashed var(--accent);
+  color: var(--accent-dark);
+  border-radius: var(--radius);
+  padding: 22px 36px;
+  font-weight: 700;
+  font-size: 15px;
+  box-shadow: var(--shadow);
+}
+
 .progress {
   height: 6px;
   background: var(--accent-soft);

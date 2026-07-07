@@ -1,7 +1,7 @@
 # CiteCorner 開発進捗 (PROGRESS.md)
 
 > 別の Mac で続きを再開するための引き継ぎメモ。このファイルとソースを読めば再開できる。
-> 最終更新: 2026-05-30
+> 最終更新: 2026-07-07（スマート入力UI・自動検索へ全面改修 + ドラッグ&ドロップ/貼り付け対応）
 
 ---
 
@@ -14,61 +14,71 @@
 - **制約**: APIキー不要・サーバー側状態なし・localStorage 等のブラウザストレージ未使用
 - **UI**: 日本語、スマホ対応、落ち着いたグリーン基調（アクセント `#587850` / 背景 `#F8F8F4`）
 
-DOI / PMID / タイトル / PDF / 画像・テキスト の5方式で文献情報を取得し、
-Vancouver 形式など5種に整形してワンクリックでコピーできる。
-
 ---
 
-## 2. 現在の状態 — **入力1〜5 + リセット 全部完成・動作確認済み**
+## 2. 現在の状態 — **スマート入力UI（第2世代）完成・全フロー動作確認済み**
 
-最初の指示「入力1〜4を先に完成→動作確認→そのあと画像OCR(入力5)」は**両方とも完了済み**。
-さらに追加要望の**ヘッダー右リセットボタン**も実装・検証済み。
+初期版（DOI/PMID/タイトル/PDF/画像テキストの5タブ・手動実行）は完成後、
+ユーザー要望により **自動判別・自動検索UI** に全面改修済み（2026-07-07）。
 
-### 完了・ブラウザ実機で確認済みの機能
+### 現在のタブ構成（3タブ）
 
-| 機能 | 状態 | 確認に使った実データ |
-|---|---|---|
-| 入力1 DOI | ✅ | `10.1056/NEJMoa2021436`, `10.1371/journal.pmed.0020124` |
-| 入力2 PMID | ✅ | `32678530`, `16060722` |
-| 入力3 タイトル検索→候補→選択 | ✅ | "Global cancer statistics 2020 GLOBOCAN…" |
-| 入力4 PDF→DOI自動抽出→取得 | ✅ | PLoS Medicine の実PDFで検証 |
-| 入力5 画像OCR(tesseract.js)+推定整形 | ✅ | canvas生成画像でOCR実行確認 |
-| 入力5 テキスト貼付→推定整形 | ✅ | Vancouver風テキスト各種 |
-| 出力5種 + コピーボタン | ✅ | 「コピーしました」表示も確認 |
-| リセット（結果表示時のみ確認ダイアログ） | ✅ | はい/いいえ/結果なし即クリア の4経路 |
-| 本番ビルド `npm run build` | ✅ | エラー0で通過 |
+| タブ | 挙動 |
+|---|---|
+| **テキスト（自動判別）** | 1つの入力欄に文字列を入れると DOI / PMID / タイトルを自動判別し、**Enterなしで自動検索**（デバウンス: ID系400ms/タイトル800ms）。誤認識は種類チップ（自動判別/DOI/PMID/タイトル）で強制指定でき、**Enterで即実行**。引用文字列に埋め込まれたDOI/PMIDも検出（外れたらタイトル検索へ自動フォールバック）。オフライン推定整形へのリンクあり |
+| **PDF** | 選択と同時に解析。DOI検出→即取得。DOIが無い/外れたら**1ページ目の最大フォント行からタイトル推定**→自動検索。推定タイトルは編集欄で修正して再検索可能 |
+| **画像OCR** | 選択と同時に tesseract.js でOCR→**タイトル優先で自動検索**（OCRはDOIの文字誤読が多いため。実測でも Ioannidis→loannidis と誤読）→見つからなければ検出DOIでフォールバック。OCRテキストは編集可能で、編集すると自動再検索。「このDOI/PMIDで取得」「推定で整形」ボタンも併設 |
 
-### 整形ロジックの検証済みケース（`src/lib/format.js`）
-- **著者1人・団体著者には `et al.` を付けない**（"The RECOVERY Collaborative Group" で確認）
-- 複数著者は `Takeda T, et al.` 形式（姓 イニシャル・ピリオドなし・カンマ区切り）
-- タイトル末尾が `?` でもピリオド重複なし（`… false? Lancet.` 等）
-- 欠損項目（号・頁・PMID等）は自動で省略、情報表示では「なし」
-- DOI取得時は esearch→esummary で PMID 逆引き、**雑誌略名は MEDLINE 側を優先**
+### ドラッグ&ドロップ / 貼り付け（どのタブでも）
+
+- **ページ全体がドロップ受付**（`InputPanel.jsx` の window リスナー）。ドラッグ中は点線オーバーレイ表示。
+- PDFをドロップ → PDFタブへ自動切替して即解析。画像をドロップ → 画像OCRタブへ自動切替して即OCR。
+- テキスト欄への**画像貼り付け（Cmd+V のスクリーンショット等）**も同様にOCRフローへ。
+- 非対応ファイル（.txt等）はエラーメッセージのみ・タブ移動なし。
+- ファイル以外のドラッグ（テキスト選択等）は素通し（`types` に `Files` を含む場合のみ介入）。
+- 受け渡しは `{file, kind, token}` で、各タブ側は token を見て**1回だけ**処理（StrictMode二重実行対策）。
+- 処理中（busy）のドロップは無視。ロジックは既存の processFile / processImage をそのまま呼ぶ（複製なし）。
+
+### ブラウザ実機で確認済み（2026-07-07の改修後）
+
+- DOI貼付→750msで自動取得（チップに検出ハイライト表示）
+- PMID `32678530` →自動取得
+- タイトル→候補リスト→選択→PubMed補完（MEDLINE略名・PMID）
+- 引用文字列（DOI埋め込み）→DOI優先で自動取得
+- DOI文字列を「タイトル」チップで強制検索→候補6件（誤認識修正の動作確認）
+- DOIチップ+Enterで即実行
+- PDF→DOI検出→自動取得、推定タイトル欄に正確なタイトル表示
+- 画像OCR→3秒でOCR→タイトル自動検索→候補8件→選択→完全な結果
+- PDFドロップ→PDFタブ自動切替→800msで取得（テキストタブから）
+- 画像ドロップ→画像OCRタブ自動切替→OCR→候補表示
+- 画像貼り付け（onPaste）→OCRフローへルーティング→候補表示
+- .txtドロップ→エラー表示のみ・タブ移動なし
+- ドラッグ中オーバーレイの表示/非表示
+- `npm run build` エラー0
+- 整形ロジック（単著/団体著者は et al. なし、`?`末尾のピリオド重複なし等）は初期版から不変・検証済み
+
+### ユニットテスト（手動実行スクリプト）
+
+- 判別ロジック: 14ケース全合格（`node /tmp/detecttest.mjs` 相当。リポジトリ未保存 — `src/lib/detect.js` の `detectInput` に対して DOI/URL/doi:接頭辞/PMID/埋め込み/空文字 などを検証した）
 
 ---
 
 ## 3. 別の Mac で再開する手順
 
 このフォルダは Dropbox 配下（`~/Dropbox/ClaudeCode/citecorner`）なので、ファイル自体は同期される。
-ただし **`node_modules` は OS/Mac 間でそのまま使い回さず、入れ直すのが安全**。
+ただし **`node_modules` は入れ直すのが安全**。
 
 ```bash
 cd ~/Dropbox/ClaudeCode/citecorner
-
-# 1. 依存を入れ直す（node_modules が同期されていても一度消して入れ直すと確実）
 rm -rf node_modules
 npm install
-
-# 2. 開発サーバー起動 → http://localhost:5173/
-npm run dev
-
-# 3. 本番ビルド確認（任意）
-npm run build      # dist/ に出力
-npm run preview    # http://localhost:4173/ でビルド結果を確認
+npm run dev        # http://localhost:5173 （PORT環境変数があればそちらを使用）
+npm run build      # 本番ビルド → dist/
 ```
 
-- 推奨環境: Node 18+（開発時は Node v25.9.0 / npm 11.12.1 を使用）
-- Git は未初期化。バージョン管理したい場合は `git init` から（`.gitignore` は用意済み）。
+- 推奨環境: Node 18+（開発時は Node v25.9.0 / npm 11.12.1）
+- **Git**: 初期化済み（`1ef2e6c Initial commit: CiteCorner`）。
+  スマート入力UIへの改修分は**未コミット**（2026-07-07時点）。再開時に `git status` で確認を。
 
 ---
 
@@ -76,101 +86,112 @@ npm run preview    # http://localhost:4173/ でビルド結果を確認
 
 ```
 citecorner/
-├── index.html                      # エントリHTML（favicon=緑のCマーク、lang=ja）
-├── vite.config.js                  # ★dev時 /api/ncbi → eutils へproxy する設定
+├── index.html                      # エントリHTML
+├── vite.config.js                  # ★/api/ncbi devプロキシ + PORT環境変数対応
 ├── package.json / package-lock.json
-├── .gitignore
-├── README.md                       # 利用者・デプロイ向け説明
-├── PROGRESS.md                     # このファイル
-├── .claude/launch.json             # プレビュー用ツール設定（開発補助・本番無関係）
+├── .gitignore / README.md / PROGRESS.md
+├── .claude/launch.json             # プレビュー用（autoPort対応・開発補助）
 ├── functions/
 │   └── api/ncbi/[[path]].js        # ★Cloudflare Pages Function: eutils中継プロキシ
 └── src/
-    ├── main.jsx                    # React マウント
-    ├── App.jsx                     # ★ルート: 状態管理・run()共通化・リセット制御
-    ├── index.css                   # 全スタイル（CSS変数でテーマ定義）
+    ├── main.jsx / App.jsx          # ★App: 状態管理・run()・リセット制御
+    ├── index.css                   # 全スタイル（チップ・インライン状態表示含む）
     ├── components/
-    │   ├── Header.jsx              # ヘッダー（右側に children でリセットを差し込む）
-    │   ├── InputPanel.jsx          # タブ切替（DOI/PMID/タイトル/PDF/画像・テキスト）
-    │   ├── DoiInput.jsx            # 入力1
-    │   ├── PmidInput.jsx           # 入力2
-    │   ├── TitleInput.jsx          # 入力3（検索→CandidateList）
-    │   ├── PdfInput.jsx            # 入力4（pdf.js→DOI or タイトル検索）
-    │   ├── ImageTextInput.jsx      # 入力5（OCR+貼付→推定、DOI/PMID検出時は正確取得）
-    │   ├── CandidateList.jsx       # CrossRef候補の表示・選択
-    │   ├── CopyButton.jsx          # クリップボードコピー+「コピーしました」
-    │   └── ResultCard.jsx          # 取得情報テーブル + 出力5種
+    │   ├── Header.jsx              # ヘッダー（children=リセットボタン）
+    │   ├── InputPanel.jsx          # 3タブ切替（テキスト/PDF/画像OCR）
+    │   ├── SmartInput.jsx          # ★自動判別+自動検索+種類チップ+Enter即実行
+    │   ├── PdfInput.jsx            # PDF解析→DOI即取得/タイトル推定検索（編集可）
+    │   ├── ImageInput.jsx          # OCR→タイトル優先自動検索→DOIフォールバック
+    │   ├── CandidateList.jsx       # 候補の表示・選択
+    │   ├── CopyButton.jsx          # コピー+「コピーしました」
+    │   └── ResultCard.jsx          # 取得情報 + 出力5種
     └── lib/
-        ├── api.js                  # ★CrossRef直 + eutils(同一オリジン)、正規化・enrich
-        ├── format.js               # ★引用文字列の整形（純粋関数・テスト容易）
-        ├── pdf.js                  # pdf.jsでテキスト抽出・DOI/タイトル推定
-        ├── parse.js                # 自由テキストの推定パース（適当モード）
-        └── ocr.js                  # tesseract.js ラッパ（動的import・遅延読込）
+        ├── api.js                  # ★CrossRef直/eutils同一オリジン・正規化・enrich
+        ├── detect.js               # ★入力種類の自動判別 + OCR塊からのタイトル抽出
+        ├── format.js               # ★引用整形（純粋関数）
+        ├── pdf.js                  # pdf.js抽出・DOI検出・タイトル推定（ドロップキャップ対応）
+        ├── parse.js                # 自由テキストの推定パース
+        └── ocr.js                  # tesseract.js ラッパ（動的import）
 ```
 
-`★` が中核ファイル。挙動を直す時はまずここを見る。
+旧 `DoiInput.jsx` / `PmidInput.jsx` / `TitleInput.jsx` / `ImageTextInput.jsx` は削除済み（SmartInput/ImageInputに置換）。
 
 ---
 
 ## 5. アーキテクチャ・重要な技術的決定
 
-### 5-1. CrossRef は直アクセス / NCBI eutils は同一オリジン経由
-- **CrossRef** (`api.crossref.org`) は CORS 対応 → フロントから直接 fetch。
-- **NCBI eutils** はフロントからは**常に同一オリジンの `/api/ncbi/...`** を叩く。
-  - 開発時: `vite.config.js` の dev proxy が `/api/ncbi` → `https://eutils.ncbi.nlm.nih.gov/entrez/eutils` に転送。
-  - 本番時: `functions/api/ncbi/[[path]].js`（Cloudflare Pages Function）が同じく中継。
-  - → dev/prod どちらでもフロントのコードは同じ。CORSで弾かれても本番で動く。
-- 補足: 調査時点では eutils は実は `access-control-allow-origin: *` を返していたが、
-  指示通り**プロキシ経由に統一**して将来の CORS 変更に対して堅牢にしてある。
+### 5-1. データ取得経路（初期版から不変）
+- **CrossRef** は CORS対応 → ブラウザから直接。
+- **NCBI eutils** は常に同一オリジン `/api/ncbi/...`（dev=Viteプロキシ / prod=Pages Function）。
+- DOI取得時は esearch→esummary で enrich し、**雑誌略名は MEDLINE 優先**・PMID補完。
 
-### 5-2. DOI取得時の enrich フロー（`src/lib/api.js` の `enrich()`）
-1. CrossRef で works/{doi} を取得・正規化
-2. esearch で `{doi}[doi]` → PMID を逆引き
-3. PMID があれば esummary を取得し、**雑誌略名(MEDLINE)を優先**、欠損項目を補完
+### 5-2. 自動判別ルール（`src/lib/detect.js` の `detectInput`）
+1. 4〜9桁の純数字 → PMID（1〜3桁は誤爆防止で自動発火させない）
+2. `PMID: 123...` 明示形 → PMID
+3. DOI正規表現（素のDOI / doi.org URL / doi:接頭辞 / 引用文字列埋め込み）→ DOI。
+   埋め込み時は `embedded: true` を付け、**取得失敗時にタイトル検索へ自動フォールバック**
+4. 引用文字列中の `PMID: n` → PMID（embedded）
+5. それ以外 → タイトル
 
-### 5-3. ライブラリの遅延読込
-- `tesseract.js` は `src/lib/ocr.js` 内で `await import('tesseract.js')`（動的import）。
-  OCRを使った時だけ読み込むので初期表示が軽い（ビルドで別チャンクに分離される）。
-- `pdfjs-dist` のワーカーは Vite の `?worker` で実ワーカーとしてバンドル
-  （`src/lib/pdf.js` 冒頭。fake worker 回避のためここは重要）。
+### 5-3. 自動検索（SmartInput / ImageInput 共通パターン）
+- デバウンス: DOI/PMID 400ms、タイトル 800ms、OCRテキスト 900ms
+- タイトルの自動発火は **12文字以上**（入力途中の無駄打ち防止）
+- **通し番号（seqRef）** で古い応答を破棄（入力が変わるたび無効化）
+- **lastKey** で同一クエリの再実行を抑止（成功時のみ記録、失敗時はクリアして再試行可能に）
+- Enter=強制即実行（IME変換中の Enter は `isComposing` で無視、Shift+Enter=改行）
+- 自動検索の状態はカード内のインライン表示（グローバルスピナーは候補選択など明示操作用）
 
-### 5-4. リセットの実装（`src/App.jsx`）
-- `resetKey` を `+1` して `<InputPanel key={resetKey}>` を**再マウント**し、
-  各入力タブのローカル状態（入力値・候補）をまとめて初期化。
-- `result`（取得結果）が表示されている時だけ「リセットしますか？ はい/いいえ」確認を挟む。
-  結果が無い時は確認なしで即クリア。
+### 5-4. OCRは「タイトル優先・DOIフォールバック」（ユーザー指定 + 実測根拠）
+OCRは `I`→`l` 等の誤読が多く、DOIは1文字違いで解決不能になる。
+タイトルは CrossRef `query.bibliographic` が誤読に頑健。実測でも「loannidis」誤読下で正解候補を取得できた。
+検出DOI/PMIDは「このIDで取得」ボタンとして常時併設（手動ショートカット）。
 
-### 5-5. ビルド時の注意（ハマりどころ）
-- `public/` ディレクトリに余計なサブフォルダを作らないこと。Vite は `public/*` を
-  `dist/` 直下にコピーするため、`functions/` 等を誤って入れると dist が汚れる。
-  （開発中に一度発生→削除済み。現在 `public/` は存在しない＝それで正常。）
+### 5-5. PDFタイトル推定（`src/lib/pdf.js`）
+- 1ページ目上部の**最大フォント行**を基本としつつ:
+  - **ドロップキャップ対策**: 行内で最大フォント文字が占める割合 < 0.5 の行は除外
+    （PLoS実PDFで「Pevidence, with ensuing confusion」誤抽出→修正済み）
+  - 最大サイズで単語数<3なら次に大きいサイズへ**最大4段階フォールバック**
+  - 記事種別ラベル（Original Article / Essay / Review 等）は除外
+- PDFメタデータTitleは「3語以上・ファイル名らしくない」場合のみ採用
+  （`PLME0208_696-701.indd` のようなゴミを排除）
+
+### 5-6. その他
+- tesseract.js は動的import（初期表示軽量）。英語traineddataは初回にCDN取得。
+- pdfjs-dist のワーカーは `?worker` で実ワーカー化（fake worker回避）。
+- リセットは `key` 再マウント方式。結果表示中のみ確認ダイアログ。
+- `public/` に余計なものを置かない（Vite が dist 直下へコピーするため）。現在 public/ は無し。
+- `.claude/launch.json` は autoPort 対応、`vite.config.js` は PORT 環境変数を読む
+  （ポート5173が他プロセスに使われていても開発サーバーが起動できる）。
 
 ---
 
 ## 6. 重要な決定事項（ユーザー判断）
 
-| 項目 | 決定 | 対応 |
+| 日付 | 項目 | 決定 |
 |---|---|---|
-| eutils `tool=`/`email=`・CrossRef `mailto` | **今はダミーのまま**でよい | `src/lib/api.js` L9-11 に `citecorner@example.com` 等。本番前に要差し替え |
-| ヘッダー右側 | タグライン廃止し**リセットボタン**を配置 | 実装済み（結果表示時のみ確認ダイアログ） |
+| 2026-05-30 | eutils `tool=`/`email=`・CrossRef `mailto` | **ダミーのまま**（`citecorner@example.com`）。本番前に `src/lib/api.js` の `TOOL`/`EMAIL`/`MAILTO` を差し替え |
+| 2026-05-30 | ヘッダー右 | リセットボタン（結果表示時のみ確認） |
+| 2026-07-07 | 入力UX | **自動判別・Enterなし自動検索**に全面改修。誤認識は種類チップ+Enterで修正可能に。表示方法（候補→選択）は維持 |
+| 2026-07-07 | OCRの検索戦略 | **タイトル優先、DOIはフォールバック**（ユーザー指定） |
+| 2026-07-07 | ファイル入力 | **トップページで完結**: PDF/画像はページ全体へのドラッグ&ドロップ・貼り付けで自動判別（該当タブへ自動切替）。タブのファイル選択はスマホ用に残す |
 
 ---
 
 ## 7. 残りのタスク / 未完了 / 既知の制限
 
 ### 本番化の前にやること
-- [ ] **連絡先の差し替え**: `src/lib/api.js` の `TOOL` / `EMAIL` / `MAILTO`
-      （現在ダミー `citecorner@example.com` / tool=`citecorner`）を実際の値に。
-- [ ] **Cloudflare Pages への実デプロイ**（下記セクション8）。まだビルド確認のみで未デプロイ。
+- [ ] **連絡先の差し替え**: `src/lib/api.js` の `TOOL` / `EMAIL` / `MAILTO`（現在ダミー）
+- [ ] **Cloudflare Pages への実デプロイ**（ビルド確認のみ。未デプロイ）
+- [ ] **改修分のコミット**（スマート入力UI改修は未コミット）
 
-### 任意の改善余地（必須ではない）
-- [ ] 自動テストは未整備（整形ロジック検証は手動スクリプトで実施、リポジトリには未保存）。
-      `src/lib/format.js` と `src/lib/parse.js` は純粋関数なのでユニットテストを足しやすい。
-- [ ] PDF のタイトル推定（`src/lib/pdf.js`）は最大フォント行ベースのヒューリスティック。
-      レイアウト次第で外すことがある。その場合は「タイトル」タブで手動検索する導線あり。
-- [ ] 適当モード（`src/lib/parse.js`）は Vancouver 風の並びを想定。崩れた入力では推定精度が落ちる
-      （仕様通り「推定（要確認）」バッジを出して明示している）。
-- [ ] ビルド時に pdf.worker チャンクが 500KB 超の警告が出る（動作影響なし。気になれば分割設定）。
+### 任意の改善余地
+- [ ] 自動テスト未整備（`detect.js`/`format.js`/`parse.js` は純粋関数でテスト容易）
+- [ ] CrossRef のタイトル検索は入力が滅茶苦茶でも「何かしら候補を返す」ため、
+      画像OCRのDOIフォールバック（候補0件時）は実際にはほぼ発火しない。
+      wrong候補が並んだ場合の救済は「このDOIで取得」ボタンが担う設計
+- [ ] pdf.worker チャンク500KB超の警告（動作影響なし）
+- [ ] タイトル自動検索は入力停止ごとに CrossRef を1回叩く（デバウンス済みだが、
+      さらに絞るなら最小語数条件などを追加可能）
 
 ---
 
@@ -183,19 +204,17 @@ citecorner/
 | Functions | `functions/` を自動検出（設定不要） |
 | 環境変数 / シークレット | **不要** |
 
-- `functions/` はプロジェクトルートに置く（Cloudflare Pages がルートから読む）。配置済み。
-- OCRの英語学習データ(traineddata)は初回利用時に tesseract.js 既定のCDNから取得（APIキー不要）。
-- デプロイ方法は「GitHub連携」または「`wrangler pages deploy dist`」のどちらでも可。
-
 ---
 
 ## 9. 動作確認に使える鉄板サンプル
 
 ```
-DOI : 10.1056/NEJMoa2021436   (RECOVERY/デキサメタゾン → 団体著者で et al. なしを確認できる)
-DOI : 10.1371/journal.pmed.0020124  (Ioannidis 単著 → 単著で et al. なしを確認できる)
-PMID: 32678530
-PMID: 16060722
-適当モード貼付例:
-  Sung H, Ferlay J, Siegel RL. Global Cancer Statistics 2020. CA Cancer J Clin. 2021;71(3):209-249.
+DOI : 10.1056/NEJMoa2021436   (団体著者 → et al. なし確認)
+DOI : 10.1371/journal.pmed.0020124  (単著 → et al. なし確認)
+PMID: 32678530 / 16060722
+タイトル: Global cancer statistics 2020 GLOBOCAN estimates of incidence and mortality
+引用文字列(DOI埋め込み):
+  RECOVERY Collaborative Group. Dexamethasone in Hospitalized Patients with Covid-19. N Engl J Med. 2021;384(8):693-704. doi:10.1056/NEJMoa2021436
+テスト用PDF: PLoS Med の Ioannidis 2005 (printable版にDOI記載あり、タイトル推定の検証にも使える)
+  https://journals.plos.org/plosmedicine/article/file?id=10.1371/journal.pmed.0020124&type=printable
 ```
