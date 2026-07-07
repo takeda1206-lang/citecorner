@@ -54,6 +54,14 @@ export default function App() {
   return (
     <div className="container">
       <Header>
+        <a
+          className="reset-btn header-link"
+          href="./usage.html"
+          target="_blank"
+          rel="noopener"
+        >
+          使い方
+        </a>
         {confirming ? (
           <span className="reset-confirm">
             <span className="reset-confirm-label">リセットしますか？</span>

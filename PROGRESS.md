@@ -1,7 +1,7 @@
 # CiteCorner 開発進捗 (PROGRESS.md)
 
 > 別の Mac で続きを再開するための引き継ぎメモ。このファイルとソースを読めば再開できる。
-> 最終更新: 2026-07-07（日本語文献対応: 検索なし整形 + 修正欄）
+> 最終更新: 2026-07-07（使い方ページ /usage.html 追加・ヘッダーから参照可）
 
 ---
 
@@ -46,6 +46,16 @@
   （注意: OCR自体は現在英語のみ。日本語画像のOCRは未対応＝tesseractのjpnデータ未読込）。
 - ブラウザ実機で検証済み: 日本語入力時 **CrossRef/NCBIへのリクエストが0件**であることを
   performance API で確認。修正欄の反映・英語との切替（修正欄の出現/消滅）も確認。
+
+### 使い方ページ（2026-07-07 追加）
+
+- `public/usage.html` — 静的な説明書ページ（アプリと同じ配色・自己完結CSS・スマホ対応）。
+  ビルドで `dist/usage.html` にコピーされ、本番では `/usage.html` で配信される。
+- アプリのヘッダー右に「使い方」リンク（新規タブで開く）。「← アプリに戻る」リンクあり。
+- 内容: クイックスタート / 出力5種の使い分け / 誤認識の直し方 / PDF / 画像OCR /
+  日本語文献 / D&D / FAQ / データの取り扱い。
+- 注意: `public/` 直下の**ファイル**は正しい使い方（dist直下にコピーされる）。
+  以前の警告は `public/` に**サブディレクトリ**（functions等）を置く事故のこと。
 
 ### ドラッグ&ドロップ / 貼り付け（どのタブでも）
 
@@ -108,6 +118,8 @@ citecorner/
 ├── vite.config.js                  # ★/api/ncbi devプロキシ + PORT環境変数対応
 ├── package.json / package-lock.json
 ├── .gitignore / README.md / PROGRESS.md
+├── public/
+│   └── usage.html                  # 使い方ページ（静的・自己完結。/usage.html で配信）
 ├── .claude/launch.json             # プレビュー用（autoPort対応・開発補助）
 ├── functions/
 │   └── api/ncbi/[[path]].js        # ★Cloudflare Pages Function: eutils中継プロキシ

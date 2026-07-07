@@ -105,6 +105,12 @@ body {
   cursor: not-allowed;
 }
 
+a.header-link {
+  text-decoration: none;
+  display: inline-block;
+  color: var(--accent-dark);
+}
+
 .reset-confirm {
   display: flex;
   align-items: center;
